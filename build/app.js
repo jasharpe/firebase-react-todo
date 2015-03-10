@@ -54,10 +54,6 @@ var TodoText = React.createClass({displayName: "TodoText",
   },
   componentWillMount: function() {
     this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/text");
-    
-    // TODO: why is this necessary? hitting the on value handler twice should
-    // do this.
-    //$("#" + this.props.todoKey + "-text").text("");
 
     // Update the todo's text when it changes.
     this.setText("");
@@ -73,44 +69,6 @@ var TodoText = React.createClass({displayName: "TodoText",
   componentDidMount: function() {
     $("#" + this.props.todoKey + "-text").text(this.text);
     $("#" + this.props.todoKey + "-text").blur(this.onTextBlur);
-  },
-  shouldComponentUpdate: function(nextProps, nextState) {
-    console.log('shouldComponentUpdate');
-    console.log(this.getDOMNode());
-    console.log(this.props);
-    console.log(nextProps);
-    return true;
-  },
-  componentWillReceiveProps: function(nextProps) {
-    console.log("componentWillReceiveProps");
-    console.log(this.getDOMNode());
-    console.log(this.props);
-    console.log(nextProps);
-    console.log($("#" + nextProps.todoKey + "-text").length);
-  },
-  componentWillUpdate: function() {
-    // Unregister everything here.
-    this.ref.off();
-    $("#" + this.props.todoKey + "-text").off('blur');
-    console.log("componentWillUpdate");
-    console.log(this.getDOMNode());
-  },
-  componentDidUpdate: function() {
-    // Register everything here.
-    this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/text");
-    this.setText("");
-    this.ref.on("value", function(snap) {
-      if (snap.val() !== null) {
-        $("#" + this.props.todoKey + "-text").text(snap.val());
-        this.setText(snap.val());
-      } else {
-        this.ref.set("");
-      }
-    }.bind(this));
-    $("#" + this.props.todoKey + "-text").blur(this.onTextBlur);
-
-    console.log("componentDidUpdate");
-    console.log(this.getDOMNode());
   },
   onTextBlur: function(event) {
     this.ref.set($(event.target).text());
@@ -257,7 +215,7 @@ var TodoList = React.createClass({displayName: "TodoList",
         return null;
       }
       return (
-        React.createElement(Todo, {todoKey: todo.k})
+        React.createElement(Todo, {key: todo.k, todoKey: todo.k})
       );
     }).filter(function(todo) { return todo !== null; });
     return (
