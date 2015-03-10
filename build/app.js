@@ -74,13 +74,43 @@ var TodoText = React.createClass({displayName: "TodoText",
     $("#" + this.props.todoKey + "-text").text(this.text);
     $("#" + this.props.todoKey + "-text").blur(this.onTextBlur);
   },
+  shouldComponentUpdate: function(nextProps, nextState) {
+    console.log('shouldComponentUpdate');
+    console.log(this.getDOMNode());
+    console.log(this.props);
+    console.log(nextProps);
+    return true;
+  },
   componentWillReceiveProps: function(nextProps) {
     console.log("componentWillReceiveProps");
+    console.log(this.getDOMNode());
+    console.log(this.props);
     console.log(nextProps);
+    console.log($("#" + nextProps.todoKey + "-text").length);
+  },
+  componentWillUpdate: function() {
+    // Unregister everything here.
+    this.ref.off();
+    $("#" + this.props.todoKey + "-text").off('blur');
+    console.log("componentWillUpdate");
+    console.log(this.getDOMNode());
   },
   componentDidUpdate: function() {
+    // Register everything here.
+    this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/text");
+    this.setText("");
+    this.ref.on("value", function(snap) {
+      if (snap.val() !== null) {
+        $("#" + this.props.todoKey + "-text").text(snap.val());
+        this.setText(snap.val());
+      } else {
+        this.ref.set("");
+      }
+    }.bind(this));
+    $("#" + this.props.todoKey + "-text").blur(this.onTextBlur);
+
     console.log("componentDidUpdate");
-    console.log(this.DOMNode);
+    console.log(this.getDOMNode());
   },
   onTextBlur: function(event) {
     this.ref.set($(event.target).text());
