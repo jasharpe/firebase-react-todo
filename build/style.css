@@ -1,0 +1,100 @@
+#lists {
+  margin-bottom:20px;
+}
+
+.page-header {
+  margin-top:20px;
+}
+
+#todo-list {
+  box-shadow:none;
+  -webkit-box-shadow:none;
+}
+
+.todo {
+  box-shadow: 0 1px 2px rgba(0,0,0,.075);
+}
+
+.todo-check {
+  border-radius:.25em;
+  border-style: solid;
+  border-width: 2px;
+  margin: .1em .5em .3em 0;
+  line-height:1em;
+  padding-left:1px;
+  padding-right:1.5px;
+  color: black;
+}
+
+.todo-check:hover, .todo-check:visited {
+  color: black;
+}
+
+.todo-check span {
+  line-height: 0.9em;
+}
+
+.todo-done .todo-check-mark {
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+.todo-not-done .todo-check-mark {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.todo-done .todo-check {
+  color: grey;
+  transition: color 0.2s;
+}
+
+.todo-not-done .todo-check {
+  color: black;
+  transition: color 0.2s;
+}
+
+.todo-not-done .todo-text {
+  color:black;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.todo-done .todo-text {
+  color:grey;
+  text-decoration: line-through;
+  transition: color 0.2s;
+}
+
+.todo-text:focus {
+  border:none;
+  box-shadow:none;
+  -webkit-box-shadow:none;
+  outline:none;
+}
+
+.indented {
+  margin-left:25px;
+}
+
+[contentEditable=plaintext-only]:empty:not(:focus):before{
+  content:attr(data-ph);
+  color:grey;
+}
+
+@-webkit-keyframes blink {
+    from, to { color: white }
+    50% { color: black }
+}
+
+@-moz-keyframes blink {
+    from, to { color: white }
+    50% { color: black }
+}
+
+[contentEditable=plaintext-only]:empty:focus:before{
+  content: "|";
+  color:black;
+  -webkit-animation: 1s blink step-end infinite;
+  -moz-animation: 1s blink step-end infinite;
+}
