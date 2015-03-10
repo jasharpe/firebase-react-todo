@@ -59,6 +59,7 @@ var TodoText = React.createClass({
     this.setText("");
     this.ref.on("value", function(snap) {
       if (snap.val() !== null) {
+        this.props.todo.setIsEmpty(snap.val() === "");
         $("#" + this.props.todoKey + "-text").text(snap.val());
         this.setText(snap.val());
       } else {
@@ -123,6 +124,9 @@ var Todo = React.createClass({
       done: done
     });
   },
+  setIsEmpty: function(isEmpty) {
+    this.props.todoList.setIsEmpty(this.props.todoObj, isEmpty);
+  },
   render: function() {
     var doneClass = this.state.done ? "todo-done" : "todo-not-done";
     return (
@@ -150,6 +154,8 @@ var TodoList = React.createClass({
       if (snap.val() === null) {
         this.ref.push({
           text: "",
+          after: "",
+          before: "",
         });
         return;
       }
@@ -162,6 +168,8 @@ var TodoList = React.createClass({
       });
       if (!returnedTrue) {
         this.ref.push({
+          after: "",
+          before: "",
           text: "",
         });
         return;
@@ -209,15 +217,30 @@ var TodoList = React.createClass({
   componentWillUnmount: function() {
     this.ref.off();
   },
+  setIsEmpty: function(todo, isEmpty) {
+    if (todo.val.before === "" && !isEmpty) {
+      var pushedRef = this.ref.push({
+        text: "",
+        after: todo.k,
+        before: "",
+      });
+      var update = {};
+      update[todo.k] = todo.val
+      update[todo.k].before = pushedRef.key();
+      this.ref.update(update);
+    }
+  },
   render: function() {
-    var todos = this.state.todos.map(function (todo) {
-      if (todo.val.deleted) {
-        return null;
-      }
-      return (
-        <Todo key={todo.k} todoKey={todo.k} />
+    var undeletedTodos = this.state.todos.filter(function(todo) {
+      return !todo.val.deleted;
+    });
+    var todoList = this;
+    var todos = undeletedTodos.map(function (todo, i) {
+      var todoElement = (
+        <Todo key={todo.k} todoList={todoList} todoObj={todo} todoKey={todo.k} />
       );
-    }).filter(function(todo) { return todo !== null; });
+      return todoElement;
+    });
     return (
       <div>
         <h1 id="list_title">{this.props.title}</h1>
