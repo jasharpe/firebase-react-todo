@@ -26,6 +26,27 @@
   color: black;
 }
 
+.todo-handle {
+  position:absolute;
+  float: left;
+  display: block;
+  margin: 12px 0 0 -13px;
+  color: grey;
+  visibility: hidden;
+}
+
+.todo:hover .todo-handle {
+  visibility: visible;
+}
+
+.todo-delete {
+  visibility: hidden;
+}
+
+.todo:hover .todo-delete {
+  visibility: visible;
+}
+
 .todo-check:hover, .todo-check:visited {
   color: black;
 }

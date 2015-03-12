@@ -47,10 +47,10 @@ var TodoCheck = React.createClass({displayName: "TodoCheck",
 var TodoText = React.createClass({displayName: "TodoText",
   componentWillUnmount: function() {
     this.ref.off();
-    $("#" + this.props.todoKey + "-text").off('blur');
   },
   setText: function(text) {
     this.text = text;
+    this.props.todo.setText(text);
   },
   componentWillMount: function() {
     this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/text");
@@ -69,14 +69,34 @@ var TodoText = React.createClass({displayName: "TodoText",
   },
   componentDidMount: function() {
     $("#" + this.props.todoKey + "-text").text(this.text);
-    $("#" + this.props.todoKey + "-text").blur(this.onTextBlur);
   },
   onTextBlur: function(event) {
     this.ref.set($(event.target).text());
   },
+  onKeyDown: function(event) {
+    if (event.nativeEvent.keyCode == 40) {  // Down
+      var before = this.props.todo.props.todoObj.val.before;
+      if (before) {
+        $("#" + before + "-text").focus();
+      }
+      event.preventDefault();
+    } else if (event.nativeEvent.keyCode == 38) { // Up
+      var after = this.props.todo.props.todoObj.val.after;
+      if (after) {
+        $("#" + after + "-text").focus();
+      }
+    } else if (event.nativeEvent.keyCode == 13) { // Enter
+
+    } else if (event.nativeEvent.keyCode == 27) { // Escape
+      $("#" + this.props.todoKey + "-text").blur();
+      window.getSelection().removeAllRanges();
+    }
+  },
   render: function() {
     return (
       React.createElement("span", {
+        onBlur: this.onTextBlur, 
+        onKeyDown: this.onKeyDown, 
         id: this.props.todoKey + "-text", 
         contentEditable: "plaintext-only", 
         "data-ph": "Todo", 
@@ -97,16 +117,13 @@ var TodoDelete = React.createClass({displayName: "TodoDelete",
     this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/deleted");
   },
   onClick: function() {
-    this.ref.set(true);
+    this.props.todo.markDeleted();
   },
   render: function() {
-    if (this.props.isLast) {
-      return null;
-    }
     return (
       React.createElement("button", {
         onClick: this.onClick, type: "button", 
-        className: "close", "aria-label": "Close"}, 
+        className: "close todo-delete", "aria-label": "Close"}, 
         React.createElement("span", {
           "aria-hidden": "true", 
           dangerouslySetInnerHTML: {__html: '&times;'}})
@@ -115,13 +132,29 @@ var TodoDelete = React.createClass({displayName: "TodoDelete",
   },
 });
 
+var TodoHandle = React.createClass({displayName: "TodoHandle",
+  render: function() {
+    return (
+      React.createElement("span", {className: "todo-handle glyphicon glyphicon-option-vertical"})
+    );
+  },
+});
+
 var Todo = React.createClass({displayName: "Todo",
   getInitialState: function() {
     return {};
   },
+  markDeleted: function() {
+    this.props.todoList.markDeleted(this.props.todoObj);
+  },
   setDone: function(done) {
     this.setState({
       done: done
+    });
+  },
+  setText: function(text) {
+    this.setState({
+      text: text,
     });
   },
   setIsEmpty: function(isEmpty) {
@@ -129,13 +162,19 @@ var Todo = React.createClass({displayName: "Todo",
   },
   render: function() {
     var doneClass = this.state.done ? "todo-done" : "todo-not-done";
+    var notEmptyLast = (this.props.todoObj.val.before || this.state.text);
+    var todoDelete = notEmptyLast ?
+      React.createElement(TodoDelete, {todo: this, todoKey: this.props.todoKey}) : null;
+    var todoHandle = notEmptyLast ? React.createElement(TodoHandle, null) : null;
+    var sortableClass = notEmptyLast ? "sortable-todo" : "";
     return (
       React.createElement("li", {
         id: this.props.todoKey, 
-        className: "list-group-item todo " + doneClass}, 
+        className: "list-group-item todo " + doneClass + " " + sortableClass}, 
+        todoHandle, 
         React.createElement(TodoCheck, {todo: this, todoKey: this.props.todoKey}), 
         React.createElement(TodoText, {todo: this, todoKey: this.props.todoKey}), 
-        React.createElement(TodoDelete, {isLast: false, todoKey: this.props.todoKey})
+        todoDelete
       )
     );
   }
@@ -214,8 +253,80 @@ var TodoList = React.createClass({displayName: "TodoList",
       }
     }.bind(this));
   },
+  componentDidMount: function() {
+    var that = this;
+    $("#todo-list").sortable({
+      handle: ".todo-handle",
+      items: "> .sortable-todo",
+      update: function (event, ui) {
+        console.log(ui);
+        // TODO: figure out how to get the moved item and new position and such.
+        // use beforeStop?
+        var idToTodo = {};
+        var lastTodo = null;
+        for (var i = 0; i < that.todos.length; i++) {
+          var todo = that.todos[i];
+          if (!todo.val.deleted) {
+            idToTodo[todo.k] = todo;
+            lastTodo = todo;
+          }
+        }
+        console.log(idToTodo);
+        console.log(lastTodo);
+        var ids = $("#todo-list").sortable('toArray');
+        for (var i = 0; i < ids.length; i++) {
+          var id = ids[i];
+          var prevId = i > 0 ? ids[i - 1] : null;
+          var nextId = i < ids.length - 1 ? ids[i + 1] : null;
+          console.log(prevId + " " + id + " " + nextId);
+        }
+        // Prevent actual reordering by the sortable. Let Firebase take care of it.
+        $("#todo-list").sortable('cancel');
+      }
+    });
+  },
   componentWillUnmount: function() {
     this.ref.off();
+  },
+  markDeleted: function(todoObj) {
+    var update = {};
+    var beforeKey = todoObj.val.before;
+    var afterKey = todoObj.val.after;
+    var before;
+    var after;
+    for (var i = 0; i < this.todos.length; i++) {
+      var todo = this.todos[i];
+      if (beforeKey && todo.k === beforeKey) {
+        before = todo;
+      }
+      if (afterKey && todo.k === afterKey) {
+        after = todo;
+      }
+    }
+    var thisVal = todoObj.val;
+    thisVal.before = null;
+    thisVal.after = null;
+    thisVal.deleted = true;
+    update[todoObj.k] = todoObj.val;
+    if (before) {
+      var beforeVal = before.val;
+      if (after) {
+        beforeVal.after = after.k;
+      } else {
+        beforeVal.after = null;
+      }
+      update[before.k] = beforeVal;
+    }
+    if (after) {
+      var afterVal = after.val;
+      if (before) {
+        afterVal.before = before.k;
+      } else {
+        afterVal.before = null;
+      }
+      update[after.k] = afterVal;
+    }
+    this.ref.update(update);
   },
   setIsEmpty: function(todo, isEmpty) {
     if (todo.val.before === "" && !isEmpty) {
