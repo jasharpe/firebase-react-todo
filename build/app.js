@@ -74,6 +74,7 @@ var TodoText = React.createClass({displayName: "TodoText",
   onTextBlur: function(event) {
     this.ref.set($(event.target).text());
   },
+  // TODO: figure out how to put the caret at the end of the text on up/down.
   onKeyDown: function(event) {
     if (event.nativeEvent.keyCode == 40) {  // Down
       var before = this.props.todo.props.todoObj.val.before;
