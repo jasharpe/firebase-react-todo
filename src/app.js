@@ -44,6 +44,7 @@ var TodoCheck = React.createClass({
   },
 });
 
+// TODO: fix copy and paste creating HTML entities.
 var TodoText = React.createClass({
   componentWillUnmount: function() {
     this.ref.off();
@@ -86,7 +87,10 @@ var TodoText = React.createClass({
         $("#" + after + "-text").focus();
       }
     } else if (event.nativeEvent.keyCode == 13) { // Enter
-
+      event.preventDefault();
+      if ($("#" + this.props.todoKey + "-text").text()) {
+        this.props.todo.props.todoList.addEmptyAfter(this.props.todoKey);
+      }
     } else if (event.nativeEvent.keyCode == 27) { // Escape
       $("#" + this.props.todoKey + "-text").blur();
       window.getSelection().removeAllRanges();
@@ -259,29 +263,28 @@ var TodoList = React.createClass({
       handle: ".todo-handle",
       items: "> .sortable-todo",
       update: function (event, ui) {
-        console.log(ui);
-        // TODO: figure out how to get the moved item and new position and such.
-        // use beforeStop?
-        var idToTodo = {};
-        var lastTodo = null;
-        for (var i = 0; i < that.todos.length; i++) {
-          var todo = that.todos[i];
-          if (!todo.val.deleted) {
-            idToTodo[todo.k] = todo;
-            lastTodo = todo;
-          }
-        }
-        console.log(idToTodo);
-        console.log(lastTodo);
+        todoMap = that.getTodoMap();
+        console.log(todoMap);
         var ids = $("#todo-list").sortable('toArray');
+        ids.push(todoMap.last.k);
+
+        var update = {};
         for (var i = 0; i < ids.length; i++) {
           var id = ids[i];
-          var prevId = i > 0 ? ids[i - 1] : null;
-          var nextId = i < ids.length - 1 ? ids[i + 1] : null;
-          console.log(prevId + " " + id + " " + nextId);
+          var prevId = i > 0 ? ids[i - 1] : "";
+          var nextId = (i < ids.length - 1) ? ids[i + 1] : "";
+          var currentTodo = todoMap.map[id];
+          if ((prevId != currentTodo.val.after) ||
+              (nextId != currentTodo.val.before)) {
+            update[id] = currentTodo.val;
+            update[id].after = prevId;
+            update[id].before = nextId;
+          }
         }
+        console.log(update);
         // Prevent actual reordering by the sortable. Let Firebase take care of it.
         $("#todo-list").sortable('cancel');
+        that.ref.update(update);
       }
     });
   },
@@ -341,8 +344,79 @@ var TodoList = React.createClass({
       this.ref.update(update);
     }
   },
+  getTodoMap: function() {
+    var idToTodo = {};
+    var firstTodo = null;
+    var lastTodo = null;
+    for (var i = 0; i < this.todos.length; i++) {
+      var todo = this.todos[i];
+      if (!todo.val.deleted) {
+        idToTodo[todo.k] = todo;
+        if (!todo.val.after) {
+          firstTodo = todo;
+        }
+        if (!todo.val.before) {
+          lastTodo = todo;
+        }
+      }
+    }
+    return {
+      map: idToTodo,
+      first: firstTodo,
+      last: lastTodo,
+    };
+  },
+  clone: function(obj) {
+    return jQuery.extend(true, {}, obj);
+  },
+  addEmptyAfter: function(todoKey) {
+    var todoMap = this.getTodoMap();
+    var currentTodo = todoMap.map[todoKey];
+    var oldBefore = todoMap.map[currentTodo.val.before];
+    console.log(oldBefore);
+    if (oldBefore && !oldBefore.val.text) {
+      $("#" + oldBefore.k + "-text").focus();
+      return;
+    }
+
+    var newTodoKey = this.ref.push({
+      text: "",
+      deleted: true,
+    }).key();
+    var update = {};
+    update[currentTodo.k] = this.clone(currentTodo.val);
+    update[currentTodo.k].before = newTodoKey;
+    update[newTodoKey] = {
+      text: "",
+      after: currentTodo.k,
+      before: currentTodo.val.before,
+      deleted: false,
+    };
+    console.log(currentTodo.val.before);
+    console.log(oldBefore);
+    if (oldBefore) {
+      update[oldBefore.k] = this.clone(oldBefore.val);
+      update[oldBefore.k].after = newTodoKey;
+    }
+    this.focusKey = newTodoKey;
+    this.ref.update(update);
+  },
+  componentDidUpdate: function() {
+    if (this.focusKey) {
+      $("#" + this.focusKey + "-text").focus();
+      this.focusKey = undefined;
+    }
+  },
   render: function() {
-    var undeletedTodos = this.state.todos.filter(function(todo) {
+    this.todos = this.state.todos;  // Is this guaranteed already?
+    var todoMap = this.getTodoMap();
+    var todos = [];
+    var todo = todoMap.first;
+    while (todo) {
+      todos.push(todo);
+      todo = todoMap.map[todo.val.before];
+    }
+    var undeletedTodos = todos.filter(function(todo) {
       return !todo.val.deleted;
     });
     var todoList = this;
