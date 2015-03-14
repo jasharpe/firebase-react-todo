@@ -60,6 +60,9 @@ var TodoText = React.createClass({
     this.setText("");
     this.ref.on("value", function(snap) {
       if (snap.val() !== null) {
+        if (this.text == snap.val()) {
+          return;
+        }
         this.props.todo.setIsEmpty(snap.val() === "");
         $("#" + this.props.todoKey + "-text").text(snap.val());
         this.setText(snap.val());
@@ -89,12 +92,23 @@ var TodoText = React.createClass({
       }
     } else if (event.nativeEvent.keyCode == 13) { // Enter
       event.preventDefault();
-      if ($("#" + this.props.todoKey + "-text").text()) {
-        this.props.todo.props.todoList.addEmptyAfter(this.props.todoKey);
+      var text = $("#" + this.props.todoKey + "-text").text();
+      if (text) {
+        var offset = window.getSelection().baseOffset;
+        var first = text.substring(0, offset);
+        var second = text.substring(offset);
+        this.props.todo.props.todoList.addAfter(
+          this.props.todoKey, first, second);
       }
     } else if (event.nativeEvent.keyCode == 27) { // Escape
       $("#" + this.props.todoKey + "-text").blur();
       window.getSelection().removeAllRanges();
+    } else if (event.nativeEvent.keyCode == 8) {  // Backspace
+      var after = this.props.todo.props.todoObj.val.after;
+      if (after && !$("#" + this.props.todoKey + "-text").text()) {
+        this.props.todo.markDeleted(true);
+        event.preventDefault();
+      }
     }
   },
   render: function() {
@@ -122,7 +136,7 @@ var TodoDelete = React.createClass({
     this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/deleted");
   },
   onClick: function() {
-    this.props.todo.markDeleted();
+    this.props.todo.markDeleted(false);
   },
   render: function() {
     return (
@@ -149,8 +163,8 @@ var Todo = React.createClass({
   getInitialState: function() {
     return {};
   },
-  markDeleted: function() {
-    this.props.todoList.markDeleted(this.props.todoObj);
+  markDeleted: function(goToPrev) {
+    this.props.todoList.markDeleted(this.props.todoObj, goToPrev);
   },
   setDone: function(done) {
     this.setState({
@@ -265,7 +279,6 @@ var TodoList = React.createClass({
       items: "> .sortable-todo",
       update: function (event, ui) {
         todoMap = that.getTodoMap();
-        console.log(todoMap);
         var ids = $("#todo-list").sortable('toArray');
         ids.push(todoMap.last.k);
 
@@ -282,7 +295,6 @@ var TodoList = React.createClass({
             update[id].before = nextId;
           }
         }
-        console.log(update);
         // Prevent actual reordering by the sortable. Let Firebase take care of it.
         $("#todo-list").sortable('cancel');
         that.ref.update(update);
@@ -292,7 +304,7 @@ var TodoList = React.createClass({
   componentWillUnmount: function() {
     this.ref.off();
   },
-  markDeleted: function(todoObj) {
+  markDeleted: function(todoObj, goToPrev) {
     var update = {};
     var beforeKey = todoObj.val.before;
     var afterKey = todoObj.val.after;
@@ -329,6 +341,9 @@ var TodoList = React.createClass({
         afterVal.before = null;
       }
       update[after.k] = afterVal;
+      if (goToPrev) {
+        this.focusKey = after.k;
+      }
     }
     this.ref.update(update);
   },
@@ -367,15 +382,11 @@ var TodoList = React.createClass({
       last: lastTodo,
     };
   },
-  clone: function(obj) {
-    return jQuery.extend(true, {}, obj);
-  },
-  addEmptyAfter: function(todoKey) {
+  addAfter: function(todoKey, first, second) {
     var todoMap = this.getTodoMap();
     var currentTodo = todoMap.map[todoKey];
     var oldBefore = todoMap.map[currentTodo.val.before];
-    console.log(oldBefore);
-    if (oldBefore && !oldBefore.val.text) {
+    if (oldBefore && !oldBefore.val.text && !second) {
       $("#" + oldBefore.k + "-text").focus();
       return;
     }
@@ -385,18 +396,18 @@ var TodoList = React.createClass({
       deleted: true,
     }).key();
     var update = {};
-    update[currentTodo.k] = this.clone(currentTodo.val);
+    var currentBefore = currentTodo.val.before;
+    update[currentTodo.k] = currentTodo.val;
     update[currentTodo.k].before = newTodoKey;
+    update[currentTodo.k].text = first;
     update[newTodoKey] = {
-      text: "",
+      text: second,
       after: currentTodo.k,
-      before: currentTodo.val.before,
-      deleted: false,
+      before: currentBefore,
+      deleted: null,
     };
-    console.log(currentTodo.val.before);
-    console.log(oldBefore);
     if (oldBefore) {
-      update[oldBefore.k] = this.clone(oldBefore.val);
+      update[oldBefore.k] = oldBefore.val;
       update[oldBefore.k].after = newTodoKey;
     }
     this.focusKey = newTodoKey;
@@ -413,9 +424,11 @@ var TodoList = React.createClass({
     var todoMap = this.getTodoMap();
     var todos = [];
     var todo = todoMap.first;
-    while (todo) {
+    var cutoff = 10000;
+    while (todo && cutoff > 0) {
       todos.push(todo);
       todo = todoMap.map[todo.val.before];
+      cutoff--;
     }
     var undeletedTodos = todos.filter(function(todo) {
       return !todo.val.deleted;
