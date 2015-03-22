@@ -64,8 +64,19 @@ var TodoText = React.createClass({
           return;
         }
         this.props.todo.setIsEmpty(snap.val() === "");
+        var shouldFade =
+            ($("#" + this.props.todoKey + "-text").text() != snap.val());
         $("#" + this.props.todoKey + "-text").text(snap.val());
         this.setText(snap.val());
+
+        // This is only triggered if someone else changed the text (since
+        // otherwise local edits would have caused the span text to equal
+        // the snap value already).
+        if (shouldFade) {
+          $($("#" + this.props.todoKey + "-text").parent())
+              .animate({"background-color": "#fad163"}, 0)
+              .animate({"background-color": "white"}, 2000);
+        }
       } else {
         this.ref.set("");
       }
@@ -79,6 +90,7 @@ var TodoText = React.createClass({
   },
   // TODO: figure out how to put the caret at the end of the text on up/down.
   onKeyDown: function(event) {
+    console.log(event.nativeEvent);
     if (event.nativeEvent.keyCode == 40) {  // Down
       var before = this.props.todo.props.todoObj.val.before;
       if (before) {
@@ -90,6 +102,10 @@ var TodoText = React.createClass({
       if (after) {
         $("#" + after + "-text").focus();
       }
+    } else if (event.nativeEvent.keyCode == 13 &&
+        event.nativeEvent.shiftKey) {  //  Shift + Enter
+      event.preventDefault();
+      this.props.todo.props.todoList.addChild(this.props.todoKey);
     } else if (event.nativeEvent.keyCode == 13) { // Enter
       event.preventDefault();
       var text = $("#" + this.props.todoKey + "-text").text();
@@ -362,25 +378,33 @@ var TodoList = React.createClass({
   },
   getTodoMap: function() {
     var idToTodo = {};
-    var firstTodo = null;
-    var lastTodo = null;
+    var firstTodoByParent = {};
+    var lastTodoByParent = {};
     for (var i = 0; i < this.todos.length; i++) {
       var todo = this.todos[i];
+      var parent = todo.val.parent ? todo.val.parent : null;
+      if (!(parent in firstTodoByParent)) {
+        firstTodoByParent[parent] = null;
+        lastTodoByParent[parent] = null;
+      }
       if (!todo.val.deleted) {
         idToTodo[todo.k] = todo;
         if (!todo.val.after) {
-          firstTodo = todo;
+          firstTodoByParent[parent] = todo;
         }
         if (!todo.val.before) {
-          lastTodo = todo;
+          lastTodoByParent[parent] = todo;
         }
       }
     }
     return {
       map: idToTodo,
-      first: firstTodo,
-      last: lastTodo,
+      firsts: firstTodoByParent,
+      lasts: firstTodoByParent,
     };
+  },
+  addChild: function(todoKey) {
+
   },
   addAfter: function(todoKey, first, second) {
     var todoMap = this.getTodoMap();
@@ -422,13 +446,17 @@ var TodoList = React.createClass({
   render: function() {
     this.todos = this.state.todos;  // Is this guaranteed already?
     var todoMap = this.getTodoMap();
+    console.log(todoMap);
     var todos = [];
-    var todo = todoMap.first;
+    var todo = todoMap.firsts[null];
     var cutoff = 10000;
     while (todo && cutoff > 0) {
       todos.push(todo);
       todo = todoMap.map[todo.val.before];
       cutoff--;
+    }
+    if (cutoff == 0) {
+      console.log("Aborted due to infinite loop.");
     }
     var undeletedTodos = todos.filter(function(todo) {
       return !todo.val.deleted;
@@ -473,7 +501,38 @@ var ListPage = React.createClass({
 });
 
 var Nav = React.createClass({
+  componentWillUnmount: function() {
+    this.ref.off();
+  },
+  authHandler: function(authData) {
+    this.replaceState({
+      authed: !!authData
+    });
+  },
+  componentWillMount: function() {
+    this.ref = new Firebase(fb);
+    this.ref.onAuth(this.authHandler);
+  },
+  logoutOnClick: function(event) {
+    this.ref.unauth();
+    event.preventDefault();
+  },
   render: function() {
+    var leftLinks = null;
+    var logoutButton = null;
+    if (this.state.authed) {
+      leftLinks = (
+        <li>
+          <a onClick={this.props.app.navOnClick({page: "LISTS"})}
+             href="/#/lists">
+              Lists
+          </a>
+        </li>
+      );
+      logoutButton = (
+        <li><a onClick={this.logoutOnClick} href="#">Logout</a></li>
+      );
+    }
     return (
       <nav className="navbar navbar-default navbar-static-top">
         <div className="container">
@@ -481,7 +540,10 @@ var Nav = React.createClass({
             <a onClick={this.props.app.navOnClick({page: "LISTS"})} className="navbar-brand" href="/#/lists">Firebase Todo</a>
           </div>
           <ul className="nav navbar-nav">
-            <li><a onClick={this.props.app.navOnClick({page: "LISTS"})} href="/#/lists">Lists</a></li>
+            {leftLinks}
+          </ul>
+          <ul className="nav navbar-nav navbar-right">
+            {logoutButton}
           </ul>
         </div>
       </nav>
@@ -489,11 +551,47 @@ var Nav = React.createClass({
   },
 });
 
+var Login = React.createClass({
+  componentWillUnmount: function() {
+    this.ref.off();
+  },
+  authHandler: function(error, authData) {
+    if (authData) {
+      this.props.app.goToState(this.props.nextState, true);
+    }
+  },
+  onAuthHandler: function(authData) {
+    this.authHandler(null, authData);
+  },
+  componentWillMount: function() {
+    this.ref = new Firebase(fb);
+    // HACK: Weird stuff happens if we replace the state of the App from
+    // componentWillMount, so schedule adding the onAuth listener
+    // until slightly later so this doesn't occur synchronously.
+    setTimeout(function() {
+      this.ref.onAuth(this.onAuthHandler);
+    }.bind(this), 0);
+  },
+  loginWithGoogle: function() {
+    this.ref.authWithOAuthPopup("google", this.authHandler);
+  },
+  render: function() {
+    return (
+      <button onClick={this.loginWithGoogle} className="btn btn-default">
+        Login with Google
+      </button>
+    );
+  },
+});
+
 var App = React.createClass({
+  componentWillUnmount: function() {
+    this.ref.off();
+  },
   getInitialState: function() {
     var state = this.getState();
     this.setHistory(state, true);
-    return this.getState();
+    return state;
   },
   setHistory: function(state, replace) {
     // Don't bother pushing a history entry if the latest state is
@@ -509,6 +607,9 @@ var App = React.createClass({
       histFunc(state, "", "#/list/" + state.todoListKey);
     } else if (state.page === "LISTS") {
       histFunc(state, "", "#/lists");
+    } else if (state.page === "LOGIN") {
+      console.log("Pushing login state");
+      histFunc(state, "", "#/login");
     } else {
       console.log("Unknown page: " + state.page);
     }
@@ -530,22 +631,65 @@ var App = React.createClass({
           page: "LISTS"
         }
       }
+      res = path.match(/login$/);
+      if (res) {
+        return {
+          page: "LOGIN",
+          nextState: {
+            page: "LISTS"
+          },
+        }
+      }
     }
     return {
       page: "LISTS"
     }
   },
   componentWillMount: function() {
+    this.ref = new Firebase(fb);
+    this.redirectToLoginIfNecessary();
+    this.ref.onAuth(function(authData) {
+      console.log("App.onAuth");
+      this.redirectToLoginIfNecessary();
+    }.bind(this));
+
     // Register history listeners.
     var app = this;
     window.onpopstate = function(event) {
       app.replaceState(event.state);
+
+      // If not authed, push the state back onto the history stack, and
+      // redirect to login.
+      var authData = app.ref.getAuth();
+      if (!authData) {
+        console.log("Pushing LOGIN onto stack.");
+        app.redirectToLoginIfNecessary();
+      }
     };
+  },
+  redirectToLoginIfNecessary: function() {
+    var authData = this.ref.getAuth();
+    if (!authData && this.state.page != "LOGIN") {
+      console.log("redirecting to login");
+      var loginState = {
+        page: "LOGIN",
+        nextState: this.state,
+      };
+      this.goToState(loginState, false);
+    }
+  },
+  goToState: function(state, replace) {
+    var authData = this.ref.getAuth();
+    if (authData || state.page == "LOGIN") {
+      this.setHistory(state, replace);
+      this.replaceState(state);
+    }
   },
   navOnClick: function(state) {
     return function(event) {
-      this.setHistory(state, false);
-      this.replaceState(state);
+      this.goToState(state, false);
+      // Prevent weird persistent highlighting.
+      event.target.blur();
       event.preventDefault();
     }.bind(this);
   },
@@ -559,6 +703,10 @@ var App = React.createClass({
     } else if (this.state.page === "LISTS") {
       return (
         <a onClick={this.navOnClick({page: "LIST", todoListKey: "-JjcFYgp1LyD5oDNNSe2"})} href="/#/list/-JjcFYgp1LyD5oDNNSe2">hi</a>
+      );
+    } else if (this.state.page === "LOGIN") {
+      return (
+        <Login app={this} nextState={this.state.nextState} />
       );
     } else {
       console.log("Unknown page: " + this.state.page);
