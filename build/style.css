@@ -18,10 +18,14 @@
   visibility: hidden;
 }
 
-#edit-title, #edit-title:hover, #edit-title:visited {
+#edit-title-dummy, #edit-title, #edit-title:hover, #edit-title:visited {
   color: grey;
   font-size: 24px;
   margin-left: 10px;
+}
+
+#edit-title-dummy {
+  visibility: hidden;
 }
 
 #list-title-container:hover #edit-title {
@@ -109,7 +113,7 @@
   transition: color 0.2s;
 }
 
-.todo-text:focus {
+.todo-text:focus, #list-title-editor:focus {
   border:none;
   box-shadow:none;
   -webkit-box-shadow:none;
@@ -121,6 +125,11 @@
 }
 
 [contentEditable=plaintext-only]:empty:not(:focus):before{
+  content:attr(data-ph);
+  color:grey;
+}
+
+h1:empty:not(:focus):before{
   content:attr(data-ph);
   color:grey;
 }

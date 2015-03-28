@@ -1,3 +1,19 @@
+jQuery.fn.selectText = function() {
+  var doc = document;
+  var element = this[0];
+  if (doc.body.createTextRange) {
+    var range = document.body.createTextRange();
+    range.moveToElementText(element);
+    range.select();
+  } else if (window.getSelection) {
+    var selection = window.getSelection();        
+    var range = document.createRange();
+    range.selectNodeContents(element);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+};
+
 var TodoCheck = React.createClass({
   getInitialState: function() {
     this.checked = false;
@@ -228,6 +244,9 @@ var TodoListTitle = React.createClass({
     this.ref.off();
   },
   componentWillMount: function() {
+    // Used for updating lastModified.
+    this.metadataRef = new Firebase(this.props.metadataListPath);
+
     this.ref = new Firebase(this.props.metadataListPath + "/title");
     this.ref.on('value', function(snap) {
       this.title = snap.val() ? snap.val() : "";
@@ -238,8 +257,10 @@ var TodoListTitle = React.createClass({
   },
   componentDidUpdate: function() {
     var editor = $("#list-title-editor");
-    if (editor) {
+    if (editor.length > 0) {
       editor.text(this.title);
+      editor.focus();
+      editor.selectText();
     }
   },
   editTitle: function(event) {
@@ -248,17 +269,38 @@ var TodoListTitle = React.createClass({
       editing: true,
     });
   },
+  saveTitle: function(event) {
+    event.preventDefault();
+    if (this.title != $("#list-title-editor").text()) {
+      this.title = $("#list-title-editor").text();
+      this.ref.set(this.title);
+      this.metadataRef.update({
+        lastModified: Date.now(),
+      });
+    }
+    this.setState({
+      editing: false,
+    });
+  },
+  onKeyDown: function(event) {
+    if (event.nativeEvent.keyCode == 13) {
+      this.saveTitle(event);
+    }
+  },
   render: function() {
     if (this.state.editing) {
       return (
         <div id="list-title-container">
-          <h1 id="list-title-editor" contentEditable="plaintext-only"></h1>
+          <h1 onBlur={this.saveTitle} onKeyDown={this.onKeyDown} data-ph="List Title" id="list-title-editor" contentEditable="plaintext-only"></h1>
+          <a id="edit-title-dummy" aria-hidden="true" href="#">
+            <span className="glyphicon glyphicon-pencil"></span>
+          </a>
         </div>
       );
     } else {
       return (
         <div id="list-title-container">
-          <h1 id="list-title">{this.state.title}</h1>
+          <h1 data-ph="List Title" id="list-title">{this.state.title}</h1>
           <a
             onClick={this.editTitle}
             id="edit-title"

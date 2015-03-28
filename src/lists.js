@@ -31,20 +31,50 @@ var ListsPage = React.createClass({
         lists: this.lists
       });
     }.bind(this));
+
+    this.ref.on("child_removed", function(childSnap) {
+      var key = childSnap.key();
+      var i;
+      for (i = 0; i < this.lists.length; i++) {
+        if (this.lists[i].k == key) {
+          break;
+        }
+      }
+      this.lists.splice(i, 1);
+      this.setState({
+        lists: this.lists,
+      });
+    }.bind(this));
+
+    this.ref.on("child_changed", function(childSnap) {
+      var key = childSnap.key();
+      for (var i = 0; i < this.lists.length; i++) {
+        if (this.lists[i].k == key) {
+          var oldTitle = this.lists[i].val.title;
+          this.lists[i].val = childSnap.val();
+          this.setState({
+            lists: this.lists,
+          });
+        }
+      }
+    }.bind(this));
   },
   createNewList: function(event) {
     this.ref.push({
       title: "",
+      lastModified: Date.now(),
     });
     event.preventDefault();
   },
   render: function() {
     var lists = this.state.lists;
-    console.log(lists);
     var undeletedLists = lists.filter(function(list) {
       return !list.val.deleted;
     });
-    console.log(undeletedLists);
+    // Order so that the most recent list comes first.
+    undeletedLists.sort(function (a, b) {
+      return b.val.lastModified - a.val.lastModified;
+    });
     var renderedLists = undeletedLists.map(function (list, i) {
       return (
         <ListsEntry key={list.k} app={this.props.app} listKey={list.k} />
@@ -56,9 +86,11 @@ var ListsPage = React.createClass({
           className="btn btn-primary">
           New List
         </button>
-        <ul id="lists" className="list-group">
-          {renderedLists}
-        </ul>
+        <div className="page-header">
+          <ul id="lists" className="list-group">
+            {renderedLists}
+          </ul>
+        </div>
       </div>
     );
   },
