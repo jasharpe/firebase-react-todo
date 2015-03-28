@@ -9,7 +9,7 @@ var TodoCheck = React.createClass({displayName: "TodoCheck",
     this.ref.off();
   },
   componentWillMount: function() {
-    this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/checked");
+    this.ref = new Firebase(this.props.listPath + "/" + this.props.todoKey + "/checked");
     
     // Update the checked state when it changes.
     this.ref.on("value", function(snap) {
@@ -54,7 +54,7 @@ var TodoText = React.createClass({displayName: "TodoText",
     this.props.todo.setText(text);
   },
   componentWillMount: function() {
-    this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/text");
+    this.ref = new Firebase(this.props.listPath + "/" + this.props.todoKey + "/text");
 
     // Update the todo's text when it changes.
     this.setText("");
@@ -149,7 +149,7 @@ var TodoDelete = React.createClass({displayName: "TodoDelete",
     this.ref.off();
   },
   componentWillMount: function() {
-    this.ref = new Firebase(fb + "/react_todos/" + this.props.todoKey + "/deleted");
+    this.ref = new Firebase(this.props.listPath + "/" + this.props.todoKey + "/deleted");
   },
   onClick: function() {
     this.props.todo.markDeleted(false);
@@ -199,7 +199,8 @@ var Todo = React.createClass({displayName: "Todo",
     var doneClass = this.state.done ? "todo-done" : "todo-not-done";
     var notEmptyLast = (this.props.todoObj.val.before || this.state.text);
     var todoDelete = notEmptyLast ?
-      React.createElement(TodoDelete, {todo: this, todoKey: this.props.todoKey}) : null;
+      React.createElement(TodoDelete, {todo: this, todoKey: this.props.todoKey, 
+        listPath: this.props.listPath}) : null;
     var todoHandle = notEmptyLast ? React.createElement(TodoHandle, null) : null;
     var sortableClass = notEmptyLast ? "sortable-todo" : "";
     return (
@@ -207,8 +208,10 @@ var Todo = React.createClass({displayName: "Todo",
         id: this.props.todoKey, 
         className: "list-group-item todo " + doneClass + " " + sortableClass}, 
         todoHandle, 
-        React.createElement(TodoCheck, {todo: this, todoKey: this.props.todoKey}), 
-        React.createElement(TodoText, {todo: this, todoKey: this.props.todoKey}), 
+        React.createElement(TodoCheck, {todo: this, todoKey: this.props.todoKey, 
+          listPath: this.props.listPath}), 
+        React.createElement(TodoText, {todo: this, todoKey: this.props.todoKey, 
+          listPath: this.props.listPath}), 
         todoDelete
       )
     );
@@ -217,11 +220,12 @@ var Todo = React.createClass({displayName: "Todo",
 
 var TodoList = React.createClass({displayName: "TodoList",
   getInitialState: function() {
+    this.listPath = fb + "/react_todos/" + this.props.uid + "/" + this.props.listKey;
     this.todos = [];
     return {todos: this.todos};
   },
   componentWillMount: function() {
-    this.ref = new Firebase("https://glaring-fire-5349.firebaseio.com/react_todos/");
+    this.ref = new Firebase(this.listPath);
     
     // Add an empty todo if none currently exist.
     this.ref.on("value", function(snap) {
@@ -464,10 +468,12 @@ var TodoList = React.createClass({displayName: "TodoList",
     var todoList = this;
     var todos = undeletedTodos.map(function (todo, i) {
       var todoElement = (
-        React.createElement(Todo, {key: todo.k, todoList: todoList, todoObj: todo, todoKey: todo.k})
+        React.createElement(Todo, {key: todo.k, todoList: todoList, 
+          todoObj: todo, todoKey: todo.k, 
+          listPath: this.listPath})
       );
       return todoElement;
-    });
+    }.bind(this));
     return (
       React.createElement("div", null, 
         React.createElement("h1", {id: "list_title"}, this.props.title), 
@@ -694,15 +700,16 @@ var App = React.createClass({displayName: "App",
     }.bind(this);
   },
   getPage: function() {
+    var authData = this.ref.getAuth();
     if (this.state.page === "LIST") {
       return (
         React.createElement(ListPage, {app: this}, 
-          React.createElement(TodoList, {todoListKey: this.state.todoListKey})
+          React.createElement(TodoList, {listKey: this.state.todoListKey, uid: authData.uid})
         )
       );
     } else if (this.state.page === "LISTS") {
       return (
-        React.createElement("a", {onClick: this.navOnClick({page: "LIST", todoListKey: "-JjcFYgp1LyD5oDNNSe2"}), href: "/#/list/-JjcFYgp1LyD5oDNNSe2"}, "hi")
+        React.createElement(ListsPage, {app: this, uid: authData.uid})
       );
     } else if (this.state.page === "LOGIN") {
       return (
