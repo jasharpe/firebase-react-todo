@@ -8,4 +8,4 @@
 
     $ jsx --watch src/ build/
 
-3. Go to http://localhost:8000 in your browser.
+3. Go to [http://localhost:8000](http://localhost:8000) in your browser.
