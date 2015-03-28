@@ -6,6 +6,28 @@
   margin-top:20px;
 }
 
+#list-title-container {
+  margin-bottom: 20px;
+}
+
+#list-title, #list-title-editor {
+  display: inline;
+}
+
+#edit-title {
+  visibility: hidden;
+}
+
+#edit-title, #edit-title:hover, #edit-title:visited {
+  color: grey;
+  font-size: 24px;
+  margin-left: 10px;
+}
+
+#list-title-container:hover #edit-title {
+  visibility: visible;
+}
+
 #todo-list {
   box-shadow:none;
   -webkit-box-shadow:none;
