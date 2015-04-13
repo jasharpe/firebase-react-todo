@@ -4,8 +4,8 @@ var ListsEntry = React.createClass({
   },
   render: function() {
     return (
-      <li id={this.props.listKey} className="list-group-item">
-        <a onClick={this.onClick()} href={"/#/list/" + this.props.listKey}>{this.props.listKey}</a>
+      <li onClick={this.onClick()} id={this.props.listKey} className="list-entry list-group-item">
+        <span>{this.props.listVal.title}</span>
       </li>
     );
   },
@@ -60,10 +60,14 @@ var ListsPage = React.createClass({
     }.bind(this));
   },
   createNewList: function(event) {
-    this.ref.push({
+    var pushedRef = this.ref.push({
       title: "",
       lastModified: Date.now(),
     });
+    this.props.app.goToState({
+      page: "LIST",
+      todoListKey: pushedRef.key(),
+    }, false);
     event.preventDefault();
   },
   render: function() {
@@ -77,7 +81,7 @@ var ListsPage = React.createClass({
     });
     var renderedLists = undeletedLists.map(function (list, i) {
       return (
-        <ListsEntry key={list.k} app={this.props.app} listKey={list.k} />
+        <ListsEntry key={list.k} app={this.props.app} listKey={list.k} listVal={list.val} />
       );
     }.bind(this));
     return (

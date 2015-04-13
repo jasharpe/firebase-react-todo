@@ -75,12 +75,14 @@ var TodoText = React.createClass({
     this.ref.on("value", function(snap) {
       if (snap.val() !== null) {
         if (this.text == snap.val()) {
+          this.updateEmptyPH();
           return;
         }
         this.props.todo.setIsEmpty(snap.val() === "");
         var shouldFade =
             ($("#" + this.props.todoKey + "-text").text() != snap.val());
         $("#" + this.props.todoKey + "-text").text(snap.val());
+        this.updateEmptyPH();
         this.setText(snap.val());
 
         // This is only triggered if someone else changed the text (since
@@ -98,6 +100,7 @@ var TodoText = React.createClass({
   },
   componentDidMount: function() {
     $("#" + this.props.todoKey + "-text").text(this.text);
+    this.updateEmptyPH();
   },
   onTextBlur: function(event) {
     this.ref.set($(event.target).text());
@@ -141,16 +144,30 @@ var TodoText = React.createClass({
       }
     }
   },
+  updateEmptyPH: function() {
+    if ($("#" + this.props.todoKey + "-text").text() === "") {
+      $("#" + this.props.todoKey + "-empty-ph").addClass("empty-ph");
+    } else {
+      $("#" + this.props.todoKey + "-empty-ph").removeClass("empty-ph");
+    }
+  },
+  focusInput: function(e) {
+    $("#" + this.props.todoKey + "-text").focus();
+    e.preventDefault();
+  },
   render: function() {
     return (
-      <span
-        onBlur={this.onTextBlur}
-        onKeyDown={this.onKeyDown}
-        id={this.props.todoKey + "-text"}
-        contentEditable="plaintext-only"
-        data-ph="Todo"
-        className="todo-text">
-      </span>
+      <div className="todo-text-clicker" onClick={this.focusInput}>
+        <span
+          onBlur={this.onTextBlur}
+          onInput={this.updateEmptyPH}
+          onKeyDown={this.onKeyDown}
+          id={this.props.todoKey + "-text"}
+          contentEditable="plaintext-only"
+          className="todo-text">
+        </span>
+        <span id={this.props.todoKey + "-empty-ph"} data-ph="Todo"></span>
+      </div>
     );
   },
 });
@@ -253,7 +270,15 @@ var TodoListTitle = React.createClass({
       this.setState({
         title: this.title,
       });
+      if (this.title == "") {
+        this.setState({
+          editing: true,
+        });
+      }
     }.bind(this));
+  },
+  componentDidMount: function() {
+    
   },
   componentDidUpdate: function() {
     var editor = $("#list-title-editor");
@@ -414,7 +439,9 @@ var TodoList = React.createClass({
       update: function (event, ui) {
         todoMap = that.getTodoMap();
         var ids = $("#todo-list").sortable('toArray');
-        ids.push(todoMap.last.k);
+        console.log(todoMap.lasts);
+        ids.push(todoMap.lasts[""].k);
+        console.log(ids);
 
         var update = {};
         for (var i = 0; i < ids.length; i++) {
@@ -431,6 +458,7 @@ var TodoList = React.createClass({
         }
         // Prevent actual reordering by the sortable. Let Firebase take care of it.
         $("#todo-list").sortable('cancel');
+        console.log(update);
         that.ref.update(update);
       }
     });
@@ -501,10 +529,10 @@ var TodoList = React.createClass({
     var lastTodoByParent = {};
     for (var i = 0; i < this.todos.length; i++) {
       var todo = this.todos[i];
-      var parent = todo.val.parent ? todo.val.parent : null;
+      var parent = todo.val.parent ? todo.val.parent : "";
       if (!(parent in firstTodoByParent)) {
-        firstTodoByParent[parent] = null;
-        lastTodoByParent[parent] = null;
+        firstTodoByParent[parent] = "";
+        lastTodoByParent[parent] = "";
       }
       if (!todo.val.deleted) {
         idToTodo[todo.k] = todo;
@@ -519,7 +547,7 @@ var TodoList = React.createClass({
     return {
       map: idToTodo,
       firsts: firstTodoByParent,
-      lasts: firstTodoByParent,
+      lasts: lastTodoByParent,
     };
   },
   addChild: function(todoKey) {
@@ -567,15 +595,18 @@ var TodoList = React.createClass({
     var todoMap = this.getTodoMap();
     console.log(todoMap);
     var todos = [];
-    var todo = todoMap.firsts[null];
-    var cutoff = 10000;
-    while (todo && cutoff > 0) {
+    var todo = todoMap.firsts[""];
+    // TODO goddammit there is an infinite loop here on sort because child_changed doesn't account for atomic updates.
+    seen = {};
+    while (todo) {
       todos.push(todo);
+      console.log(todo.k + " before " + todo.val.before);
+      if (todo.k in seen) {
+        console.log("Encountered infinite loop. Must be more updates coming.");
+        return this.prev;
+      }
+      seen[todo.k] = true;
       todo = todoMap.map[todo.val.before];
-      cutoff--;
-    }
-    if (cutoff == 0) {
-      console.log("Aborted due to infinite loop.");
     }
     var undeletedTodos = todos.filter(function(todo) {
       return !todo.val.deleted;
@@ -589,7 +620,7 @@ var TodoList = React.createClass({
       );
       return todoElement;
     }.bind(this));
-    return (
+    this.prev = (
       <div>
         <TodoListTitle metadataListPath={this.metadataListPath} />
         <ul id="todo-list" className="list-group">
@@ -597,5 +628,6 @@ var TodoList = React.createClass({
         </ul>
       </div>
     );
+    return this.prev;
   }
 });

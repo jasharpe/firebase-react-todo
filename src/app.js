@@ -20,6 +20,7 @@ var App = React.createClass({
         history.replaceState.bind(history) :
         history.pushState.bind(history);
     if (state.page === "LIST") {
+      console.log(state);
       histFunc(state, "", "#/list/" + state.todoListKey);
     } else if (state.page === "LISTS") {
       histFunc(state, "", "#/lists");

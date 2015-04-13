@@ -2,6 +2,14 @@
   margin-bottom:20px;
 }
 
+.list-entry {
+  cursor: pointer;
+}
+
+.list-entry:hover {
+  background-color: #F5F5F5;
+}
+
 .page-header {
   margin-top:20px;
 }
@@ -66,6 +74,9 @@
 }
 
 .todo-delete {
+  position: absolute;
+  right: 12px;
+  top: 9px;
   visibility: hidden;
 }
 
@@ -113,6 +124,14 @@
   transition: color 0.2s;
 }
 
+.todo-text {
+  display: inline-block;
+}
+
+.todo-text-clicker {
+  cursor: text;
+}
+
 .todo-text:focus, #list-title-editor:focus {
   border:none;
   box-shadow:none;
@@ -124,29 +143,20 @@
   margin-left:25px;
 }
 
-[contentEditable=plaintext-only]:empty:not(:focus):before{
+[contentEditable=plaintext-only]:empty:not(:focus):before {
   content:attr(data-ph);
   color:grey;
 }
 
-h1:empty:not(:focus):before{
+[contentEditable=plaintext-only] {
+  min-width:1px;
+}
+
+.empty-ph {
+  position: absolute;
+}
+
+.empty-ph:before {
   content:attr(data-ph);
   color:grey;
-}
-
-@-webkit-keyframes blink {
-    from, to { color: white }
-    50% { color: black }
-}
-
-@-moz-keyframes blink {
-    from, to { color: white }
-    50% { color: black }
-}
-
-[contentEditable=plaintext-only]:empty:focus:before{
-  content: "|";
-  color:black;
-  -webkit-animation: 1s blink step-end infinite;
-  -moz-animation: 1s blink step-end infinite;
 }
